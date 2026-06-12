@@ -144,8 +144,8 @@ TEAM_META = {
     "jordan": {"flag": "🇯🇴", "ptbr": "Jordânia"},
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
     "congo": {"flag": "🇨🇬", "ptbr": "Congo"},
-    "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
-    "democraticrepublicofthecongo": {"flag": "🇨🇬", "ptbr": "República Democrática do Congo"},
+    "drcongo": {"flag": "🇨🇬", "ptbr": "República Democrática do Congo"},
+    "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
 }
 
@@ -537,13 +537,18 @@ def calcular_pontos(gp_a, gp_b, gr_a, gr_b):
 
 def buscar_palpite_usuario(usuario, jogo_id):
     if not usuario:
-        return (0, 0)
+        return (0, 0, False)
+    
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT gols_time_a, gols_time_b FROM palpites_placar WHERE usuario = ? AND jogo_id = ?", (usuario, jogo_id))
     row = cur.fetchone()
     conn.close()
-    return row if row else (0, 0)
+    
+    if row:
+        return (row[0], row[1], True) # Retorna True se encontrou no banco
+    
+    return (0, 0, False) # Retorna False se for a primeira vez
 
 
 def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
@@ -654,7 +659,7 @@ with aba_palpites:
     for jogo in jogos_ativos:
         foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
         pode_palpitar = autorizado and not foi_bloqueado
-        palpite_salvo_a, palpite_salvo_b = buscar_palpite_usuario(usuario, jogo["id"])
+        palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
         flag_a = bandeira_time(jogo["time_a"])
         flag_b = bandeira_time(jogo["time_b"])
@@ -690,10 +695,17 @@ with aba_palpites:
             
             with c_btn:
                 if pode_palpitar:
-                    if st.button("Salvar", key=f"btn_{jogo['id']}", use_container_width=True):
+                    # Muda o texto do botão para dar feedback visual
+                    texto_botao = "🔄 Atualizar" if ja_palpitou else "Salvar"
+                    
+                    if st.button(texto_botao, key=f"btn_{jogo['id']}", use_container_width=True):
                         horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
                         st.toast(f"Palpite salvo às {horario[-8:]}!") 
                         st.rerun()
+                    
+                    # Adiciona a tag de confirmação abaixo do botão se o palpite constar no banco
+                    if ja_palpitou:
+                        st.markdown("<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ Registrado</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 Fechado</div>", unsafe_allow_html=True)
 
@@ -723,7 +735,7 @@ with aba_palpites:
                 else:
                     st.caption("Odds indisponíveis no momento.")
 
-# --- NOVA ABA DE JOGOS FINALIZADOS ---
+
 # --- NOVA ABA DE JOGOS FINALIZADOS ---
 with aba_finalizados:
     if not jogos_finalizados:
