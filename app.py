@@ -25,7 +25,7 @@ API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 # =========================
 WHITELIST_NOMES = [
     "joici",
-    "mika",
+    "mika"
     # adicione mais nomes aqui
 ]
 
@@ -707,7 +707,11 @@ with aba_palpites:
                     if ja_palpitou:
                         st.markdown("<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ Registrado</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 Fechado</div>", unsafe_allow_html=True)
+                    # Se o jogo fechou, mostra qual foi o palpite que ficou salvo
+                    if ja_palpitou:
+                        st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 Fechado<br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 Fechado<br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
 
             # Esconde as Odds e data dentro de uma sanfona (expander)
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
@@ -735,7 +739,6 @@ with aba_palpites:
                 else:
                     st.caption("Odds indisponíveis no momento.")
 
-
 # --- NOVA ABA DE JOGOS FINALIZADOS ---
 with aba_finalizados:
     if not jogos_finalizados:
@@ -747,9 +750,14 @@ with aba_finalizados:
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
+        # Busca o palpite do usuário para calcular a pontuação
+        pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
+
         # Pega os gols reais de forma segura e converte para texto
-        gols_a = str(int(jogo["gols_real_a"])) if jogo["gols_real_a"] is not None else "-"
-        gols_b = str(int(jogo["gols_real_b"])) if jogo["gols_real_b"] is not None else "-"
+        gols_real_a = jogo["gols_real_a"]
+        gols_real_b = jogo["gols_real_b"]
+        str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
+        str_gols_b = str(int(gols_real_b)) if gols_real_b is not None else "-"
 
         # Cria um "card" idêntico ao da agenda
         with st.container(border=True):
@@ -760,21 +768,32 @@ with aba_finalizados:
                 st.markdown(f"<div style='text-align: right; margin-top: 5px;'><b>{nome_a}</b> {flag_a}</div>", unsafe_allow_html=True)
             
             with c_gols_a:
-                # Placar oficial desenhado como uma caixinha preenchida para manter a harmonia visual
-                st.markdown(f"<div style='text-align: center; font-size: 16px; font-weight: bold; background-color: rgba(128, 128, 128, 0.1); border-radius: 6px; padding: 4px; margin-top: 2px;'>{gols_a}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align: center; font-size: 16px; font-weight: bold; background-color: rgba(128, 128, 128, 0.1); border-radius: 6px; padding: 4px; margin-top: 2px;'>{str_gols_a}</div>", unsafe_allow_html=True)
             
             with c_x:
                 st.markdown("<div style='text-align: center; color: gray; margin-top: 5px;'>x</div>", unsafe_allow_html=True)
 
             with c_gols_b:
-                st.markdown(f"<div style='text-align: center; font-size: 16px; font-weight: bold; background-color: rgba(128, 128, 128, 0.1); border-radius: 6px; padding: 4px; margin-top: 2px;'>{gols_b}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align: center; font-size: 16px; font-weight: bold; background-color: rgba(128, 128, 128, 0.1); border-radius: 6px; padding: 4px; margin-top: 2px;'>{str_gols_b}</div>", unsafe_allow_html=True)
                 
             with c_time_b:
                 st.markdown(f"<div style='text-align: left; margin-top: 5px;'>{flag_b} <b>{nome_b}</b></div>", unsafe_allow_html=True)
             
             with c_status:
-                # Onde ficava o botão "Salvar", colocamos um selo de "Finalizado" e a data do jogo
                 st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 14px; margin-top: 0px;'><b>✅ Encerrado</b><br><span style='color: gray; font-size: 12px;'>{jogo['data_jogo'].strftime('%d/%m %H:%M')}</span></div>", unsafe_allow_html=True)
+
+            # --- EXIBE O PALPITE DO USUÁRIO E OS PONTOS GANHOS ---
+            st.markdown("<hr style='margin: 8px 0; opacity: 0.2;'>", unsafe_allow_html=True)
+            
+            if ja_palpitou and gols_real_a is not None and gols_real_b is not None:
+                pontos = calcular_pontos(pga, pgb, gols_real_a, gols_real_b)
+                cor_pontos = "#10b981" if pontos > 0 else "#ef4444" # Verde se pontuou, Vermelho se errou tudo
+                texto_pontos = f"+{pontos} pontos" if pontos > 0 else "0 pontos"
+                st.markdown(f"<div style='text-align: center; font-size: 14px;'>Seu palpite foi: <b>{pga} x {pgb}</b> &nbsp;•&nbsp; <span style='color: {cor_pontos}; font-weight: bold;'>{texto_pontos}</span></div>", unsafe_allow_html=True)
+            elif ja_palpitou:
+                st.markdown(f"<div style='text-align: center; font-size: 14px; color: gray;'>Seu palpite: <b>{pga} x {pgb}</b> (Aguardando placar oficial)</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
     conn = conectar()
