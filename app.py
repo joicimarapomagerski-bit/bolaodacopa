@@ -25,7 +25,7 @@ API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 # =========================
 WHITELIST_NOMES = [
     "joici",
-    "mika"
+    "mika",
     # adicione mais nomes aqui
 ]
 
@@ -145,7 +145,7 @@ TEAM_META = {
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
     "congo": {"flag": "🇨🇬", "ptbr": "Congo"},
     "drcongo": {"flag": "🇨🇬", "ptbr": "República Democrática do Congo"},
-    "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
+    "democraticrepublicofthecongo": {"flag": "🇨🇬", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
 }
 
@@ -695,19 +695,15 @@ with aba_palpites:
             
             with c_btn:
                 if pode_palpitar:
-                    # Muda o texto do botão para dar feedback visual
-                    texto_botao = "🔄 Atualizar" if ja_palpitou else "Salvar"
-                    
-                    if st.button(texto_botao, key=f"btn_{jogo['id']}", use_container_width=True):
+                    if st.button("🔄 Atualizar" if ja_palpitou else "Salvar", key=f"btn_{jogo['id']}", use_container_width=True):
                         horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
                         st.toast(f"Palpite salvo às {horario[-8:]}!") 
                         st.rerun()
                     
-                    # Adiciona a tag de confirmação abaixo do botão se o palpite constar no banco
+                    # Mostra o placar que está salvo oficialmente embaixo do botão
                     if ja_palpitou:
-                        st.markdown("<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ Registrado</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ Salvo: <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
-                    # Se o jogo fechou, mostra qual foi o palpite que ficou salvo
                     if ja_palpitou:
                         st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 Fechado<br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
                     else:
@@ -796,6 +792,7 @@ with aba_finalizados:
                 st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
+    agora = datetime.now(FUSO_BR) # Necessário para checar se o jogo já começou
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro FROM palpites_placar")
@@ -826,7 +823,15 @@ with aba_ranking:
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
                 nome_b = nome_time_ptbr(jogo["time_b"])
-                st.caption(f"⏱️ {usuario_nome} → {pga}x{pgb} ({nome_a} x {nome_b}) em: {dt_reg}")
+                
+                # Verifica se a partida já iniciou/encerrou
+                jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
+                
+                # O usuário sempre vê o próprio palpite. O de terceiros fica oculto se o jogo não iniciou.
+                if jogo_bloqueado or usuario_nome.lower() == usuario.lower():
+                    st.caption(f"⏱️ {usuario_nome} → {pga}x{pgb} ({nome_a} x {nome_b}) em: {dt_reg}")
+                else:
+                    st.caption(f"⏱️ {usuario_nome} → 🔒 Oculto ({nome_a} x {nome_b})")
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
@@ -837,6 +842,12 @@ with aba_ranking:
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
                 nome_b = nome_time_ptbr(jogo["time_b"])
-                st.caption(f"{dt_reg} • {usuario_nome} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
+                
+                jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
+                
+                if jogo_bloqueado or usuario_nome.lower() == usuario.lower():
+                    st.caption(f"{dt_reg} • {usuario_nome} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
+                else:
+                    st.caption(f"{dt_reg} • {usuario_nome} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
