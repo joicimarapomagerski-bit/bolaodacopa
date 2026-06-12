@@ -27,6 +27,9 @@ WHITELIST_NOMES = [
     "Joici",
     "Mika",
     "Gustavo",
+    "Laricel",
+    "Vera",
+    "Felipe",
     # adicione mais nomes aqui
 ]
 
