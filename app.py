@@ -24,8 +24,9 @@ API_LOGIN_EMAIL = "joicimara.pomagerskii@gmail.com"
 # AJUSTE AQUI A LISTA BRANCA
 # =========================
 WHITELIST_NOMES = [
-    "joici",
-    "mika",
+    "Joici",
+    "Mika",
+    "Gustavo",
     # adicione mais nomes aqui
 ]
 
