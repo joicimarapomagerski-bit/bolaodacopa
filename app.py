@@ -30,7 +30,6 @@ WHITELIST_NOMES = [
     "Laricel",
     "Vera",
     "Zeni",
-    "Felipe",
     # adicione mais nomes aqui
 ]
 
@@ -596,7 +595,6 @@ def carregar_historico(limit=300):
 
 st.set_page_config(page_title="Bolão Copa 2026", layout="centered")
 
-# --- INJEÇÃO DE CSS PARA RESOLVER O PROBLEMA DAS BANDEIRAS NO WINDOWS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
@@ -625,7 +623,6 @@ if any("falhou" in m.lower() for m in mensagens_sync):
 else:
     st.caption(" | ".join(mensagens_sync))
 
-# --- 1. BOTÃO DE ATUALIZAR (Movido para cima) ---
 col1, col2 = st.columns([1, 1])
 with col1:
     if st.button("🔄 Atualizar agora", use_container_width=True):
@@ -635,27 +632,23 @@ with col1:
 with col2:
     st.caption("Atualização automática a cada 60 segundos.")
 
-# --- 2. CAMPO DE USUÁRIO (Aberto para digitar) ---
 usuario_input = st.text_input("👤 Usuário:", placeholder="Digite seu nome para registrar os palpites...").strip()
 autorizado = usuario_autorizado(usuario_input) if usuario_input else False
-usuario = ""
 
+usuario = ""
 if not usuario_input:
-    st.info("A agenda está liberada para visualização. Para registrar palpites, informe seu usuário.")
+    st.info("A agenda está liberada para visualização. Para registrar palpites, informe um usuário autorizado.")
 elif not autorizado:
-    st.warning("Seu usuário não foi encontrado na lista. Você consegue ver a agenda, mas não consegue registrar palpites.")
+    st.warning("Seu usuário não foi encontrado. Você consegue ver a agenda, mas não consegue registrar palpites.")
 else:
-    # --- MELHORIA 1: Força o usuário a ser minúsculo internamente para unificar buscas (Joici, joici, JOICI)
     usuario = usuario_input.lower() 
-    st.success(f"✅ Bem-vindo(a)! Usuário autorizado para registrar palpites: {usuario.title()}")
+    st.success(f"✅ Usuário autorizado para registrar palpites: {usuario.title()}")
 
 jogos_copa = carregar_jogos_do_banco()
 
-# Separa os jogos baseados no status "FT" (Full Time / Finalizado)
 jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
-# Adiciona a nova aba no Streamlit
 aba_palpites, aba_finalizados, aba_ranking = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral"])
 
 with aba_palpites:
@@ -674,10 +667,8 @@ with aba_palpites:
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
-        # Cria um "card" com borda para cada jogo da lista
         with st.container(border=True):
             
-            # Estrutura a linha principal
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_btn = st.columns([3, 1, 0.5, 1, 3, 2])
             
             with c_time_a:
@@ -708,16 +699,14 @@ with aba_palpites:
                         st.toast(f"Palpite salvo às {horario[-8:]}!") 
                         st.rerun()
                     
-                    # Mostra o placar que está salvo oficialmente embaixo do botão
                     if ja_palpitou:
                         st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
                     if ja_palpitou:
-                        st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 Fechado<br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 <br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
                     else:
-                        st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 Fechado<br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
+                        st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 <br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
 
-            # Esconde as Odds e data dentro de uma sanfona (expander)
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
                 if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
                     favorito_nome, odd_favorito = determinar_favorito(nome_a, nome_b, jogo["odd_time_a"], jogo["odd_empate"], jogo["odd_time_b"])
@@ -743,7 +732,6 @@ with aba_palpites:
                 else:
                     st.caption("Odds indisponíveis no momento.")
 
-# --- NOVA ABA DE JOGOS FINALIZADOS ---
 with aba_finalizados:
     if not jogos_finalizados:
         st.info("Nenhum jogo finalizado ainda.")
@@ -754,16 +742,13 @@ with aba_finalizados:
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
-        # Busca o palpite do usuário para calcular a pontuação
         pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
-        # Pega os gols reais de forma segura e converte para texto
         gols_real_a = jogo["gols_real_a"]
         gols_real_b = jogo["gols_real_b"]
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
         str_gols_b = str(int(gols_real_b)) if gols_real_b is not None else "-"
 
-        # Cria um "card" idêntico ao da agenda
         with st.container(border=True):
             
             c_time_a, c_gols_a, c_x, c_gols_b, c_time_b, c_status = st.columns([3, 1, 0.5, 1, 3, 2])
@@ -786,7 +771,6 @@ with aba_finalizados:
             with c_status:
                 st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 14px; margin-top: 0px;'><b>✅ Encerrado</b><br><span style='color: gray; font-size: 12px;'>{jogo['data_jogo'].strftime('%d/%m %H:%M')}</span></div>", unsafe_allow_html=True)
 
-            # --- EXIBE O PALPITE DO USUÁRIO E OS PONTOS GANHOS ---
             st.markdown("<hr style='margin: 8px 0; opacity: 0.2;'>", unsafe_allow_html=True)
             
             if ja_palpitou and gols_real_a is not None and gols_real_b is not None:
@@ -800,7 +784,7 @@ with aba_finalizados:
                 st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
-    agora = datetime.now(FUSO_BR) # Necessário para checar se o jogo já começou
+    agora = datetime.now(FUSO_BR) 
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro FROM palpites_placar")
@@ -809,8 +793,7 @@ with aba_ranking:
 
     pontuacao = {}
     mapa_jogos = {j["id"]: j for j in jogos_copa}
-    
-    # 1. Aplica o .title() no cálculo da pontuação para unificar nomes e exibir maiúsculo
+
     for usuario_nome, jogo_id, pga, pgb, _ in todos_palpites:
         nome_formatado = usuario_nome.title() 
         pontuacao.setdefault(nome_formatado, 0)
@@ -827,16 +810,13 @@ with aba_ranking:
         st.info("Nenhum palpite registrado ainda.")
 
     st.markdown("---")
-    st.write("📋 **Palpites por Jogo**")
+    st.write("📋 **Panorama de Palpites por Jogo**")
     
-    # --- MELHORIA 2: Agrupa e exibe os palpites formatados no esquema "sanfoninha" ---
     if todos_palpites:
-        # Agrupa os palpites pelo ID do jogo
         palpites_por_jogo = {}
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
             palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
             
-        # Exibe agrupado, seguindo a ordem cronológica dos jogos
         for jogo in jogos_copa:
             if jogo["id"] in palpites_por_jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
@@ -844,26 +824,24 @@ with aba_ranking:
                 flag_a = bandeira_time(jogo["time_a"])
                 flag_b = bandeira_time(jogo["time_b"])
                 
-                # Verifica se a partida já iniciou/encerrou
                 jogo_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-                status_txt = "✅ Encerrado" if jogo["status"] == "FT" else ("🔒 Em andamento" if jogo_bloqueado else "⏳ Aberto")
+                status_txt = "✅" if jogo["status"] == "FT" else ("🔒" if jogo_bloqueado else "⏳")
                 
-                with st.expander(f"⚽ {flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
+                with st.expander(f"{flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
                     for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
                         nome_formatado = usuario_nome.title()
                         
-                        # O usuário sempre vê o próprio palpite. O de terceiros fica oculto se o jogo não iniciou.
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"**{nome_formatado}** ➔ 🔒 Oculto", unsafe_allow_html=True)
+                            st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
     historico = carregar_historico(limit=500)
     if historico:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
-            nome_formatado = usuario_nome.title() # 3. Aplica o .title() no histórico
+            nome_formatado = usuario_nome.title()
             jogo = mapa_jogos.get(jogo_id)
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
@@ -874,6 +852,6 @@ with aba_ranking:
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
                 else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
+                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
