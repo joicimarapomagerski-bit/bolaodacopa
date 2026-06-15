@@ -147,8 +147,8 @@ TEAM_META = {
     "cotedivoire": {"flag": "🇨🇮", "ptbr": "Costa do Marfim"},
     "jordan": {"flag": "🇯🇴", "ptbr": "Jordânia"},
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
-    "congo": {"flag": "🇨🇬", "ptbr": "Congo"},
-    "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
+    "congodr": {"flag": "🇨🇬", "ptbr": "Congo"},
+    "drcongo": {"flag": "🇨🇬", "ptbr": "República Democrática do Congo"},
     "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
 }
@@ -212,6 +212,24 @@ def inicializar_banco():
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odd_time_b REAL")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odds_atualizadas_em TEXT")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "fonte_odds TEXT")
+
+    # --- SCRIPT DE MIGRAÇÃO: CORREÇÃO AUTOMÁTICA DE MAIÚSCULAS ---
+    # Sincroniza o banco de dados antigo com o novo padrão (tudo minúsculo)
+    cur.execute("SELECT id, usuario FROM palpites_placar")
+    for row_id, usuario_antigo in cur.fetchall():
+        usuario_novo = usuario_antigo.lower()
+        if usuario_novo != usuario_antigo:
+            try:
+                cur.execute("UPDATE palpites_placar SET usuario = ? WHERE id = ?", (usuario_novo, row_id))
+            except sqlite3.IntegrityError:
+                # Se houver conflito (ex: o usuário salvou "Gustavo" e depois "gustavo"), a versão antiga maiúscula é deletada
+                cur.execute("DELETE FROM palpites_placar WHERE id = ?", (row_id,))
+                
+    cur.execute("SELECT id, usuario FROM palpites_historico")
+    for row_id, usuario_antigo in cur.fetchall():
+        usuario_novo = usuario_antigo.lower()
+        if usuario_novo != usuario_antigo:
+            cur.execute("UPDATE palpites_historico SET usuario = ? WHERE id = ?", (usuario_novo, row_id))
 
     conn.commit()
     conn.close()
@@ -641,7 +659,7 @@ if not usuario_input:
 elif not autorizado:
     st.warning("Seu usuário não foi encontrado. Você consegue ver a agenda, mas não consegue registrar palpites.")
 else:
-    usuario = usuario_input.lower() 
+    usuario = usuario_input.lower() # Salva e busca no banco sempre minúsculo para evitar criar "Joici" e "joici" separados
     st.success(f"✅ Usuário autorizado para registrar palpites: {usuario.title()}")
 
 jogos_copa = carregar_jogos_do_banco()
@@ -703,9 +721,9 @@ with aba_palpites:
                         st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
                     if ja_palpitou:
-                        st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 <br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align: center; color: gray; font-size: 14px; margin-top: 0px;'>🔒 Fechado<br><span style='font-size: 12px; color: #3b82f6;'><b>Seu palpite:<br>{palpite_salvo_a} x {palpite_salvo_b}</b></span></div>", unsafe_allow_html=True)
                     else:
-                        st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 <br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
+                        st.markdown("<div style='text-align: center; color: gray; font-size: 14px; margin-top: 5px;'>🔒 Fechado<br><span style='font-size: 12px;'>Sem palpite</span></div>", unsafe_allow_html=True)
 
             with st.expander(f"📅 {jogo['data_jogo'].strftime('%d/%m/%Y %H:%M')} | 📊 Ver Odds"):
                 if jogo["odd_time_a"] is not None and jogo["odd_empate"] is not None and jogo["odd_time_b"] is not None:
@@ -744,6 +762,7 @@ with aba_finalizados:
 
         pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
+        # Pega os gols reais de forma segura e converte para texto
         gols_real_a = jogo["gols_real_a"]
         gols_real_b = jogo["gols_real_b"]
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
@@ -784,7 +803,7 @@ with aba_finalizados:
                 st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
-    agora = datetime.now(FUSO_BR) 
+    agora = datetime.now(FUSO_BR)
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro FROM palpites_placar")
@@ -793,7 +812,7 @@ with aba_ranking:
 
     pontuacao = {}
     mapa_jogos = {j["id"]: j for j in jogos_copa}
-
+    
     for usuario_nome, jogo_id, pga, pgb, _ in todos_palpites:
         nome_formatado = usuario_nome.title() 
         pontuacao.setdefault(nome_formatado, 0)
@@ -816,7 +835,7 @@ with aba_ranking:
         palpites_por_jogo = {}
         for usuario_nome, jogo_id, pga, pgb, dt_reg in todos_palpites:
             palpites_por_jogo.setdefault(jogo_id, []).append((usuario_nome, pga, pgb, dt_reg))
-            
+
         for jogo in jogos_copa:
             if jogo["id"] in palpites_por_jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
@@ -830,7 +849,7 @@ with aba_ranking:
                 with st.expander(f"{flag_a} {nome_a} x {nome_b} {flag_b} | {status_txt}"):
                     for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
                         nome_formatado = usuario_nome.title()
-                        
+
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
