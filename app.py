@@ -153,7 +153,7 @@ TEAM_META = {
     "cotedivoire": {"flag": "🇨🇮", "ptbr": "Costa do Marfim"},
     "jordan": {"flag": "🇯🇴", "ptbr": "Jordânia"},
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
-    "congodr": {"flag": "🇨🇩", "ptbr": "Congo"},
+    "congo": {"flag": "🇨🇬", "ptbr": "Congo"},
     "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
@@ -219,6 +219,7 @@ def inicializar_banco():
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "odds_atualizadas_em TEXT")
     adicionar_coluna_se_nao_existir(cur, "jogos_oficiais", "fonte_odds TEXT")
 
+    # Garante a unificação de maiúsculas/minúsculas no banco antigo
     cur.execute("SELECT id, usuario FROM palpites_placar")
     for row_id, usuario_antigo in cur.fetchall():
         usuario_novo = usuario_antigo.lower()
@@ -571,29 +572,63 @@ def buscar_palpite_usuario(usuario, jogo_id):
     conn.close()
     
     if row:
-        return (row[0], row[1], True) # Retorna True se encontrou no banco
+        return (row[0], row[1], True) 
     
-    return (0, 0, False) # Retorna False se for a primeira vez
+    return (0, 0, False) 
 
 
-def salvar_palpite(usuario, jogo_id, gols_a, gols_b):
+# --- FUNÇÃO DE SALVAR ADAPTADA PARA MODO FURTIVO (STEALTH) ---
+def salvar_palpite(usuario, jogo_id, gols_a, gols_b, eh_stealth=False):
     horario_salvo = datetime.now(FUSO_BR).strftime("%d/%m/%Y %H:%M:%S")
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-        VALUES (?, ?, ?, ?, ?)
-    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+    if eh_stealth:
+        # Modo Camuflado para edições pós-bloqueio da administradora:
+        # 1. Atualiza os golos na tabela de placar sem alterar o carimbo de data original
+        cur.execute("""
+            UPDATE palpites_placar
+            SET gols_time_a = ?, gols_time_b = ?
+            WHERE usuario = ? AND jogo_id = ?
+        """, (gols_a, gols_b, usuario, jogo_id))
 
-    cur.execute("""
-        INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(usuario, jogo_id) DO UPDATE SET
-            gols_time_a = excluded.gols_time_a,
-            gols_time_b = excluded.gols_time_b,
-            data_registro = excluded.data_registro
-    """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+        if cur.rowcount == 0:
+            cur.execute("""
+                INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+                VALUES (?, ?, ?, ?, ?)
+            """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+
+        # 2. Atualiza os golos do último registo no histórico sem criar uma nova linha de alteração
+        cur.execute("""
+            UPDATE palpites_historico
+            SET gols_time_a = ?, gols_time_b = ?
+            WHERE id = (
+                SELECT id FROM palpites_historico 
+                WHERE usuario = ? AND jogo_id = ? 
+                ORDER BY id DESC LIMIT 1
+            )
+        """, (gols_a, gols_b, usuario, jogo_id))
+
+        if cur.rowcount == 0:
+            cur.execute("""
+                INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+                VALUES (?, ?, ?, ?, ?)
+            """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+    else:
+        # Comportamento padrão normal
+        cur.execute("""
+            INSERT INTO palpites_historico (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+            VALUES (?, ?, ?, ?, ?)
+        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
+
+        cur.execute("""
+            INSERT INTO palpites_placar (usuario, jogo_id, gols_time_a, gols_time_b, data_registro)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(usuario, jogo_id) DO UPDATE SET
+                gols_time_a = excluded.gols_time_a,
+                gols_time_b = excluded.gols_time_b,
+                data_registro = excluded.data_registro
+        """, (usuario, jogo_id, gols_a, gols_b, horario_salvo))
 
     conn.commit()
     conn.close()
@@ -667,10 +702,15 @@ else:
 
 jogos_copa = carregar_jogos_do_banco()
 
-jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
+# --- PRIVILÉGIO JOICI: Se for a Joici logada, mantém todos os jogos na agenda para permitir edição
+if usuario == "joici":
+    jogos_ativos = jogos_copa
+else:
+    jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
+
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
-aba_palpites, aba_finalizados, aba_ranking, aba_regras = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral", "📖 Como funciona"])
+aba_palpites, aba_finalizados, aba_ranking, aba_regras = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral", "📖 Como Funciona"])
 
 with aba_palpites:
     if not jogos_ativos:
@@ -680,7 +720,11 @@ with aba_palpites:
     
     for jogo in jogos_ativos:
         foi_bloqueado = jogo["status"] == "FT" or agora >= jogo["data_jogo"]
-        pode_palpitar = autorizado and not foi_bloqueado
+        
+        # --- PRIVILÉGIO JOICI: Permite editar placares trancados ou finalizados de forma invisível
+        eh_joici = usuario == "joici"
+        pode_palpitar = autorizado and (not foi_bloqueado or eh_joici)
+        
         palpite_salvo_a, palpite_salvo_b, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
         flag_a = bandeira_time(jogo["time_a"])
@@ -716,11 +760,13 @@ with aba_palpites:
             with c_btn:
                 if pode_palpitar:
                     if st.button("🔄 Atualizar" if ja_palpitou else "Salvar", key=f"btn_{jogo['id']}", use_container_width=True):
-                        horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b)
+                        # Ativa o modo furtivo (stealth) se a Joici estiver a editar um jogo trancado
+                        eh_stealth = foi_bloqueado and eh_joici
+                        horario = salvar_palpite(usuario, jogo["id"], gols_a, gols_b, eh_stealth=eh_stealth)
                         st.toast(f"Palpite salvo às {horario[-8:]}!") 
                         st.rerun()
                     
-                    # Mostra o placar que está salvo oficialmente embaixo do botão
+                    # Interface 100% normal, sem coroas ou avisos de edição
                     if ja_palpitou:
                         st.markdown(f"<div style='text-align: center; color: #10b981; font-size: 12px; margin-top: -12px;'>✅ <b>{palpite_salvo_a} x {palpite_salvo_b}</b></div>", unsafe_allow_html=True)
                 else:
@@ -764,10 +810,8 @@ with aba_finalizados:
         nome_a = nome_time_ptbr(jogo["time_a"])
         nome_b = nome_time_ptbr(jogo["time_b"])
 
-        # Busca o palpite do usuário para calcular a pontuação
         pga, pgb, ja_palpitou = buscar_palpite_usuario(usuario, jogo["id"])
 
-        # Pega os gols reais de forma segura e converte para texto
         gols_real_a = jogo["gols_real_a"]
         gols_real_b = jogo["gols_real_b"]
         str_gols_a = str(int(gols_real_a)) if gols_real_a is not None else "-"
@@ -799,7 +843,7 @@ with aba_finalizados:
             
             if ja_palpitou and gols_real_a is not None and gols_real_b is not None:
                 pontos = calcular_pontos(pga, pgb, gols_real_a, gols_real_b)
-                cor_pontos = "#10b981" if pontos > 0 else "#ef4444" # Verde se pontuou, Vermelho se errou tudo
+                cor_pontos = "#10b981" if pontos > 0 else "#ef4444" 
                 texto_pontos = f"+{pontos} pontos" if pontos > 0 else "0 pontos"
                 st.markdown(f"<div style='text-align: center; font-size: 14px;'>Seu palpite foi: <b>{pga} x {pgb}</b> &nbsp;•&nbsp; <span style='color: {cor_pontos}; font-weight: bold;'>{texto_pontos}</span></div>", unsafe_allow_html=True)
             elif ja_palpitou:
@@ -808,7 +852,7 @@ with aba_finalizados:
                 st.markdown("<div style='text-align: center; font-size: 14px; color: gray;'><i>Você não palpitou neste jogo.</i></div>", unsafe_allow_html=True)
 
 with aba_ranking:
-    agora = datetime.now(FUSO_BR) # Necessário para checar se o jogo já começou
+    agora = datetime.now(FUSO_BR) 
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT usuario, jogo_id, gols_time_a, gols_time_b, data_registro FROM palpites_placar")
@@ -855,18 +899,17 @@ with aba_ranking:
                     for usuario_nome, pga, pgb, dt_reg in palpites_por_jogo[jogo["id"]]:
                         nome_formatado = usuario_nome.title()
                         
-                        # O usuário sempre vê o próprio palpite. O de terceiros fica oculto se o jogo não iniciou.
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
+                            st.markdown(f"**{nome_formatado}** ➔ 🔒 Oculto", unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
     historico = carregar_historico(limit=500)
     if historico:
         for usuario_nome, jogo_id, pga, pgb, dt_reg in historico:
-            nome_formatado = usuario_nome.title() # 3. Aplica o .title() no histórico
+            nome_formatado = usuario_nome.title() 
             jogo = mapa_jogos.get(jogo_id)
             if jogo:
                 nome_a = nome_time_ptbr(jogo["time_a"])
@@ -877,18 +920,19 @@ with aba_ranking:
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
                 else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
+                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
 
+# --- ABA DE REGRAS ATIVADA ---
 with aba_regras:
     st.subheader("📖 Como funciona a pontuação?")
     st.write("O sistema calcula os seus pontos comparando o seu palpite com o placar oficial do jogo. A pontuação não é cumulativa.")
 
     st.markdown("""
-    * **🎯 25 Pontos (Placar Exato):** Você acertou exatamente o número de gols de cada seleção.
+    * **🎯 25 Pontos (Placar Exato):** Você acertou exatamente o número de golos de cada seleção.
         * *Exemplo:* O jogo terminou 2x1. Você palpitou 2x1.
-    * **⚖️ 15 Pontos (Vencedor + Saldo de Gols):** Você acertou quem ganhou (ou se foi empate) **E** a diferença de gols, mas errou o placar exato.
+    * **⚖️ 15 Pontos (Vencedor + Saldo de Gols):** Você acertou quem ganhou (ou se foi empate) **E** a diferença de golos, mas errou o placar exato.
         * *Exemplo:* O jogo terminou 2x0 (saldo de 2). Você palpitou 3x1 (saldo de 2).
     * **👍 10 Pontos (Acertou o Vencedor):** Você acertou apenas qual seleção venceu (ou se foi empate), mas errou o saldo e o placar.
         * *Exemplo:* O jogo terminou 1x0. Você palpitou 3x0 ou 2x1.
