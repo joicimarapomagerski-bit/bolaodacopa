@@ -900,7 +900,7 @@ with aba_ranking:
     else:
         st.info("Nenhuma alteração registrada ainda.")
 
- with aba_regras:
+with aba_regras:
     st.subheader("📖 Como funciona a pontuação?")
     st.write("O sistema calcula os seus pontos comparando o seu palpite com o placar oficial do jogo. A pontuação não é cumulativa.")
 
