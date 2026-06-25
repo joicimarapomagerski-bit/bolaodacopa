@@ -332,8 +332,10 @@ def buscar_jogos_api():
 
     jogos = []
     for item in dados.get("matches", []):
-        # A trava que impedia a segunda fase foi removida para carregar todos os jogos!
-        
+        # TRAVA RESTAURADA: Só carrega os jogos da fase de grupos para evitar erro
+        if item.get("stage") != "GROUP_STAGE":
+            continue
+
         data_utc = datetime.fromisoformat(item["utcDate"].replace("Z", "+00:00"))
         data_br = data_utc.astimezone(FUSO_BR)
         score = item.get("score", {}) or {}
@@ -658,6 +660,7 @@ else:
 
 jogos_copa = carregar_jogos_do_banco()
 
+# --- MANTEVE O CÓDIGO ORIGINAL (Sem edição oculta de admin)
 jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
@@ -847,7 +850,7 @@ with aba_ranking:
                         pgb_det = det["pgb"]
                         pts_det = det["pontos"]
                         
-                        st.markdown(f"🌟 **+{pts_det} pts** | {flag_a} {nome_a} **{gr_a} x {gr_b}** {nome_b} {flag_b} *(Palpite: {pga_det} x {pgb_det})*")
+                        st.markdown(f"**+{pts_det} pts** | {flag_a} {nome_a} **{gr_a} x {gr_b}** {nome_b} {flag_b} *(Palpite: {pga_det} x {pgb_det})*")
                 else:
                     st.write("Ainda não pontuou em nenhuma partida encerrada.")
     else:
