@@ -1,4 +1,11 @@
+import re
+import sqlite3
+import unicodedata
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
+import requests
+import streamlit as st
 
 try:
     from streamlit_autorefresh import st_autorefresh
@@ -595,7 +602,7 @@ def salvar_palpite(usuario, jogo_id, gols_a, gols_b, eh_stealth=False):
                 row_jogo = cur.fetchone()
                 if row_jogo and row_jogo[0]:
                     dt_jogo = datetime.fromisoformat(row_jogo[0])
-                    fake_time = (dt_jogo - timedelta(hours=2)).strftime("%d/%m/%Y %H:%M:%S")
+                    fake_time = (dt_jogo - timedelta(seconds=104)).strftime("%d/%m/%Y %H:%M:%S")
             except Exception:
                 pass
 
@@ -937,11 +944,11 @@ with aba_regras:
     st.write("O sistema calcula os seus pontos comparando o seu palpite com o placar oficial do jogo. A pontuação não é cumulativa.")
 
     st.markdown("""
-    * **25 Pontos (Placar Exato):** Você acertou exatamente o número de gols de cada seleção.
+    * **🎯 25 Pontos (Placar Exato):** Você acertou exatamente o número de gols de cada seleção.
         * *Exemplo:* O jogo terminou 2x1. Você palpitou 2x1.
-    * **15 Pontos (Vencedor + Saldo de Gols):** Você acertou quem ganhou (ou se foi empate) **E** a diferença de gols, mas errou o placar exato.
+    * **⚖️ 15 Pontos (Vencedor + Saldo de Gols):** Você acertou quem ganhou (ou se foi empate) **E** a diferença de gols, mas errou o placar exato.
         * *Exemplo:* O jogo terminou 2x0 (saldo de 2). Você palpitou 3x1 (saldo de 2).
-    * **10 Pontos (Acertou o Vencedor):** Você acertou apenas qual seleção venceu (ou se foi empate), mas errou o saldo e o placar.
+    * **👍 10 Pontos (Acertou o Vencedor):** Você acertou apenas qual seleção venceu (ou se foi empate), mas errou o saldo e o placar.
         * *Exemplo:* O jogo terminou 1x0. Você palpitou 3x0 ou 2x1.
-    * **0 Pontos:** Você errou o resultado da partida (ex: apostou na vitória do Time A, mas deu empate ou Time B).
+    * **❌ 0 Pontos:** Você errou o resultado da partida (ex: apostou na vitória do Time A, mas deu empate ou Time B).
     """)
