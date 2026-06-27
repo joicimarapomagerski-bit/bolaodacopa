@@ -145,7 +145,7 @@ TEAM_META = {
     "cotedivoire": {"flag": "🇨🇮", "ptbr": "Costa do Marfim"},
     "jordan": {"flag": "🇯🇴", "ptbr": "Jordânia"},
     "uzbekistan": {"flag": "🇺🇿", "ptbr": "Usbequistão"},
-    "congodr": {"flag": "🇨🇩", "ptbr": "Congo"},
+    "congo": {"flag": "🇨🇩", "ptbr": "Congo"},
     "drcongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "democraticrepublicofthecongo": {"flag": "🇨🇩", "ptbr": "República Democrática do Congo"},
     "panama": {"flag": "🇵🇦", "ptbr": "Panamá"},
@@ -332,19 +332,19 @@ def buscar_jogos_api():
 
     jogos = []
     for item in dados.get("matches", []):
-        # TRAVA RESTAURADA: Só carrega os jogos da fase de grupos para evitar erro
-        if item.get("stage") != "GROUP_STAGE":
-            continue
-
         data_utc = datetime.fromisoformat(item["utcDate"].replace("Z", "+00:00"))
         data_br = data_utc.astimezone(FUSO_BR)
         score = item.get("score", {}) or {}
         full_time = score.get("fullTime", {}) or {}
+        
+        # Proteção adicionada para não gerar erro caso os times das próximas fases ainda não estejam definidos
+        time_a = item.get("homeTeam", {}).get("name") or "A Definir"
+        time_b = item.get("awayTeam", {}).get("name") or "A Definir"
 
         jogos.append({
             "id": str(item["id"]),
-            "time_a": item["homeTeam"]["name"],
-            "time_b": item["awayTeam"]["name"],
+            "time_a": time_a,
+            "time_b": time_b,
             "data_jogo": data_br.isoformat(),
             "gols_real_a": full_time.get("home"),
             "gols_real_b": full_time.get("away"),
@@ -664,7 +664,7 @@ jogos_copa = carregar_jogos_do_banco()
 jogos_ativos = [j for j in jogos_copa if j["status"] != "FT"]
 jogos_finalizados = [j for j in jogos_copa if j["status"] == "FT"]
 
-aba_palpites, aba_finalizados, aba_ranking, aba_regras = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral", "📖 Como funciona"])
+aba_palpites, aba_finalizados, aba_ranking, aba_regras = st.tabs(["🔮 Agenda & Palpites", "📁 Jogos Finalizados", "📊 Ranking Geral", "📖 Como Funciona"])
 
 with aba_palpites:
     if not jogos_ativos:
@@ -881,7 +881,7 @@ with aba_ranking:
                         if jogo_bloqueado or usuario_nome.lower() == usuario:
                             st.markdown(f"**{nome_formatado}** ➔ {pga} x {pgb} &nbsp;&nbsp;<span style='color:gray; font-size:12px;'>⏱️ {dt_reg}</span>", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"**{nome_formatado}** ➔ 🔒 Oculto", unsafe_allow_html=True)
+                            st.markdown(f"**{nome_formatado}** ➔ 🔒", unsafe_allow_html=True)
 
     st.markdown("---")
     st.write("🕘 **Histórico de alterações**")
@@ -899,7 +899,7 @@ with aba_ranking:
                 if jogo_bloqueado or usuario_nome.lower() == usuario:
                     st.caption(f"{dt_reg} • {nome_formatado} alterou para {pga}x{pgb} em {nome_a} x {nome_b}")
                 else:
-                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒 Oculto)")
+                    st.caption(f"{dt_reg} • {nome_formatado} atualizou o palpite em {nome_a} x {nome_b} (🔒)")
     else:
         st.info("Nenhuma alteração registrada ainda.")
 
